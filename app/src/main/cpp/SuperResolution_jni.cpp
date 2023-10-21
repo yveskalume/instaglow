@@ -12,7 +12,7 @@ namespace yveskalume {
         namespace superresolution {
 
             extern "C" JNIEXPORT jintArray JNICALL
-            Instaglow_superResolutionFromJNI(
+            Java_com_yveskalume_instaglow_MainActivity_superResolutionFromJNI(
                     JNIEnv *env, jobject thiz, jlong native_handle, jintArray low_res_rgb) {
                 jint *lr_img_rgb = env->GetIntArrayElements(low_res_rgb, NULL);
 
@@ -25,7 +25,7 @@ namespace yveskalume {
                 auto sr_rgb_colors = reinterpret_cast<SuperResolution *>(native_handle)
                         ->DoSuperResolution(static_cast<int *>(lr_img_rgb));
                 if (!sr_rgb_colors) {
-                    return nullptr;  // super resolution failed
+                    return nullptr;  // failed
                 }
                 jintArray sr_img_rgb = env->NewIntArray(kNumberOfOutputPixels);
                 env->SetIntArrayRegion(sr_img_rgb, 0, kNumberOfOutputPixels,
@@ -38,7 +38,7 @@ namespace yveskalume {
             }
 
             extern "C" JNIEXPORT jlong JNICALL
-            Instaglow_initWithByteBufferFromJNI(
+            Java_com_yveskalume_instaglow_MainActivity_initWithByteBufferFromJNI(
                     JNIEnv *env, jobject thiz, jobject model_buffer, jboolean use_gpu) {
                 const void *model_data =
                         static_cast<void *>(env->GetDirectBufferAddress(model_buffer));
@@ -55,7 +55,7 @@ namespace yveskalume {
             }
 
             extern "C" JNIEXPORT void JNICALL
-            Instaglow_deinitFromJNI(
+            Java_com_yveskalume_instaglow_MainActivity_deinitFromJNI(
                     JNIEnv *env, jobject thiz, jlong native_handle) {
                 delete reinterpret_cast<SuperResolution*>(native_handle);
             }

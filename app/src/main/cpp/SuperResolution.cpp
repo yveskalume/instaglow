@@ -13,7 +13,6 @@ namespace yveskalume {
     namespace instaglow {
         namespace superresolution {
 
-// TODO: make it changeable in the UI
             constexpr int kThreadNum = 4;
 
             SuperResolution::SuperResolution(const void* model_data, size_t model_size,
