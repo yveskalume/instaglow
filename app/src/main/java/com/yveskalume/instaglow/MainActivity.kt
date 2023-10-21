@@ -10,11 +10,24 @@ import androidx.annotation.WorkerThread
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.rememberNavController
+import com.yveskalume.instaglow.ui.navigation.Destination
+import com.yveskalume.instaglow.ui.navigation.composable
+import com.yveskalume.instaglow.ui.navigation.navigate
+import com.yveskalume.instaglow.ui.screen.editor.EditorScreen
+import com.yveskalume.instaglow.ui.screen.home.HomeScreen
 import com.yveskalume.instaglow.ui.theme.InstaglowTheme
 import com.yveskalume.instaglow.util.AssetsUtil.getAssetFileDescriptorOrCached
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.MappedByteBuffer
@@ -23,23 +36,10 @@ import java.nio.channels.FileChannel
 
 class MainActivity : ComponentActivity() {
 
-    private val TAG = "SuperResolution"
-    private val MODEL_NAME = "ESRGAN.tflite"
-    private val LR_IMAGE_HEIGHT = 50
-    private val LR_IMAGE_WIDTH = 50
-    private val UPSCALE_FACTOR = 4
-    private val SR_IMAGE_HEIGHT = LR_IMAGE_HEIGHT * UPSCALE_FACTOR
-    private val SR_IMAGE_WIDTH = LR_IMAGE_WIDTH * UPSCALE_FACTOR
-    private val LR_IMG_1 = "lr-1.jpg"
-    private val LR_IMG_2 = "lr-2.jpg"
-    private val LR_IMG_3 = "lr-3.jpg"
-
-    //    private var model: MappedByteBuffer? = null
     private var superResolutionNativeHandle: Long = 0
-    private val selectedLRBitmap: Bitmap? = null
-    private var useGPU = false
+    private lateinit var selectedBitmap: Bitmap
 
-    var imageBitmap: Bitmap? = null
+    private var scaledImagePainterFlow: MutableStateFlow<BitmapPainter?> = MutableStateFlow(null)
 
     companion object {
         init {
@@ -58,50 +58,88 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val navController = rememberNavController()
+                    NavHost(
+                        navController = navController,
+                        startDestination = Destination.Home.route
+                    ) {
+                        composable(Destination.Home) {
+                            HomeScreen(
+                                onImageSelected = {
+                                    selectedBitmap = it
+                                    navController.navigate(Destination.Editor)
+                                }
+                            )
+                        }
+                        composable(Destination.Editor) {
+                            val imagePainter by scaledImagePainterFlow.collectAsState()
 
+                            // TODO : this just to test and solve the error in process function
+                            LaunchedEffect(Unit) {
+                                process(1)
+                            }
+                            EditorScreen(
+                                image = imagePainter
+                                    ?: BitmapPainter(selectedBitmap.asImageBitmap()),
+                                onChangeResolution = { process(it) }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun process(imageBitmap: Bitmap, scale: Int): BitmapPainter? {
+    private fun process(upScaleFactor: Int) {
         if (superResolutionNativeHandle == 0L) {
-            superResolutionNativeHandle = initTFLiteInterpreter(true) ?: 0
-        } else if (useGPU !== true) {
-            // We need to reinitialize interpreter when execution hardware is changed
-            deinit()
-            superResolutionNativeHandle = initTFLiteInterpreter(true) ?: 0
+            superResolutionNativeHandle = initTFLiteInterpreter() ?: 0
         }
-//        useGPU = gpuSwitch.isChecked()
+
         if (superResolutionNativeHandle == 0L) {
             Toast.makeText(
                 this,
                 "TFLite interpreter failed to create!",
                 Toast.LENGTH_SHORT
             ).show()
-            return null
+            return
         }
 
-        val lowResRGB = IntArray(imageBitmap.height * imageBitmap.width)
-        imageBitmap.getPixels(
+        if (!::selectedBitmap.isInitialized) {
+            Toast.makeText(
+                this,
+                "Please choose one low resolution image",
+                Toast.LENGTH_LONG
+            )
+                .show();
+            return;
+        }
+
+        val lowResRGB = IntArray(selectedBitmap.height * selectedBitmap.width)
+        selectedBitmap.getPixels(
             lowResRGB,
             0,
-            imageBitmap.width,
+            selectedBitmap.width,
             0,
             0,
-            imageBitmap.width,
-            imageBitmap.height
+            selectedBitmap.width,
+            selectedBitmap.height
         )
 
         val superResRGB = doSuperResolution(lowResRGB)
 
+        Log.e("Super",selectedBitmap.width.toString())
+
         val srImgBitmap = Bitmap.createBitmap(
             superResRGB,
-            imageBitmap.width * scale,
-            imageBitmap.height * scale,
+            selectedBitmap.width * 1,
+            selectedBitmap.height * 1,
             Bitmap.Config.ARGB_8888
         )
-        return BitmapPainter(srImgBitmap.asImageBitmap())
+
+//        lifecycleScope.launch {
+//            scaledImagePainterFlow.emit(BitmapPainter(srImgBitmap.asImageBitmap()))
+//        }
+
     }
 
     @WorkerThread
@@ -112,26 +150,27 @@ class MainActivity : ComponentActivity() {
 
     @Throws(IOException::class)
     private fun loadModelFile(): MappedByteBuffer {
-        getAssetFileDescriptorOrCached(applicationContext, MODEL_NAME).use { fileDescriptor ->
-            FileInputStream(fileDescriptor.fileDescriptor).use { inputStream ->
-                val fileChannel = inputStream.channel
-                val startOffset = fileDescriptor.startOffset
-                val declaredLength = fileDescriptor.declaredLength
-                return fileChannel.map(
-                    FileChannel.MapMode.READ_ONLY,
-                    startOffset,
-                    declaredLength
-                )
+        getAssetFileDescriptorOrCached(applicationContext, "ESRGAN.tflite")
+            .use { fileDescriptor ->
+                FileInputStream(fileDescriptor.fileDescriptor).use { inputStream ->
+                    val fileChannel = inputStream.channel
+                    val startOffset = fileDescriptor.startOffset
+                    val declaredLength = fileDescriptor.declaredLength
+                    return fileChannel.map(
+                        FileChannel.MapMode.READ_ONLY,
+                        startOffset,
+                        declaredLength
+                    )
+                }
             }
-        }
     }
 
-    private fun initTFLiteInterpreter(useGPU: Boolean): Long? {
+    private fun initTFLiteInterpreter(): Long? {
         return try {
             val model = loadModelFile()
-            initWithByteBufferFromJNI(model, useGPU)
+            initWithByteBufferFromJNI(model, true)
         } catch (e: IOException) {
-            Log.e(TAG, "Fail to load model", e)
+            Log.e("MainActivity", "Fail to load model", e)
             null
         }
     }
