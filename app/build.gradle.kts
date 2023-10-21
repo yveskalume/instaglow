@@ -16,10 +16,17 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+        externalNativeBuild {
+            cmake {
+                arguments.add("-DANDROID_STL=c++_shared")
+            }
+        }
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a","arm64-v8a"))
         }
     }
 
@@ -30,6 +37,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+
+        debug {
+            isJniDebuggable = true
+            packagingOptions {
+                doNotStrip.add("**//.so")
+            }
         }
     }
     compileOptions {
@@ -48,6 +62,26 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    aaptOptions {
+        noCompress += "tflite"
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs(
+                "../libraries/tensorflowlite/jni",
+                "../libraries/tensorflowlite-gpu/jni"
+            )
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 }
