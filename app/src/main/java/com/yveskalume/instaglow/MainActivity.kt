@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
         deinit()
     }
 
-    private fun process() {
+    private suspend fun process() {
         if (superResolutionNativeHandle == 0L) {
             superResolutionNativeHandle = initTFLiteInterpreter() ?: 0
         }
@@ -148,9 +148,8 @@ class MainActivity : ComponentActivity() {
             Bitmap.Config.ARGB_8888
         )
 
-        lifecycleScope.launch {
-            scaledImagePainterFlow.emit(BitmapPainter(srImgBitmap.asImageBitmap()))
-        }
+        scaledImagePainterFlow.emit(BitmapPainter(srImgBitmap.asImageBitmap()))
+
     }
 
     @WorkerThread
