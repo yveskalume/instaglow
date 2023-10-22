@@ -5,6 +5,9 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraEnhance
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -13,6 +16,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 
 
@@ -37,8 +42,12 @@ fun HomeScreen(onImageSelected: (Bitmap) -> Unit) {
         )
     }
 
-    Scaffold(
-        floatingActionButton = {
+    Scaffold() { contentPadding ->
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+            contentAlignment = Alignment.Center
+        ) {
             ExtendedFloatingActionButton(
                 text = { Text(text = "New") },
                 icon = {
@@ -50,7 +59,5 @@ fun HomeScreen(onImageSelected: (Bitmap) -> Unit) {
                 onClick = ::pickMedia
             )
         }
-    ) { contentPadding ->
-
     }
 }

@@ -13,10 +13,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
@@ -27,6 +27,7 @@ import com.yveskalume.instaglow.ui.screen.editor.EditorScreen
 import com.yveskalume.instaglow.ui.screen.home.HomeScreen
 import com.yveskalume.instaglow.ui.theme.InstaglowTheme
 import com.yveskalume.instaglow.util.AssetsUtil.getAssetFileDescriptorOrCached
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.io.FileInputStream
@@ -81,14 +82,16 @@ class MainActivity : ComponentActivity() {
                         composable(Destination.Editor) {
                             val imagePainter by scaledImagePainterFlow.collectAsState()
 
-                            // TODO : this just to test and solve the error in process function
+                            val coroutineScope = rememberCoroutineScope()
+
                             LaunchedEffect(Unit) {
-                                process()
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    process()
+                                }
                             }
+
                             EditorScreen(
-                                image = imagePainter ?: painterResource(
-                                    id = R.drawable.ic_launcher_background
-                                ),
+                                image = imagePainter,
                             )
                         }
                     }
