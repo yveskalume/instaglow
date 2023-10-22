@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
@@ -35,6 +36,12 @@ import java.nio.channels.FileChannel
 
 
 class MainActivity : ComponentActivity() {
+
+    private val LR_IMAGE_HEIGHT = 50
+    private val LR_IMAGE_WIDTH = 50
+    private val UPSCALE_FACTOR = 4
+    private val SR_IMAGE_HEIGHT = LR_IMAGE_HEIGHT * UPSCALE_FACTOR
+    private val SR_IMAGE_WIDTH = LR_IMAGE_WIDTH * UPSCALE_FACTOR
 
     private var superResolutionNativeHandle: Long = 0
     private lateinit var selectedBitmap: Bitmap
@@ -76,12 +83,12 @@ class MainActivity : ComponentActivity() {
 
                             // TODO : this just to test and solve the error in process function
                             LaunchedEffect(Unit) {
-                                process(1)
+                                process()
                             }
                             EditorScreen(
-                                image = imagePainter
-                                    ?: BitmapPainter(selectedBitmap.asImageBitmap()),
-                                onChangeResolution = { process(it) }
+                                image = imagePainter ?: painterResource(
+                                    id = R.drawable.ic_launcher_background
+                                ),
                             )
                         }
                     }
@@ -90,7 +97,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun process(upScaleFactor: Int) {
+    override fun onDestroy() {
+        super.onDestroy()
+        deinit()
+    }
+
+    private fun process() {
         if (superResolutionNativeHandle == 0L) {
             superResolutionNativeHandle = initTFLiteInterpreter() ?: 0
         }
@@ -109,37 +121,33 @@ class MainActivity : ComponentActivity() {
                 this,
                 "Please choose one low resolution image",
                 Toast.LENGTH_LONG
-            )
-                .show();
+            ).show();
             return;
         }
 
-        val lowResRGB = IntArray(selectedBitmap.height * selectedBitmap.width)
+        val lowResRGB = IntArray(LR_IMAGE_HEIGHT * LR_IMAGE_WIDTH)
         selectedBitmap.getPixels(
             lowResRGB,
             0,
-            selectedBitmap.width,
+            LR_IMAGE_WIDTH,
             0,
             0,
-            selectedBitmap.width,
-            selectedBitmap.height
+            LR_IMAGE_WIDTH,
+            LR_IMAGE_HEIGHT
         )
 
         val superResRGB = doSuperResolution(lowResRGB)
 
-        Log.e("Super",selectedBitmap.width.toString())
-
         val srImgBitmap = Bitmap.createBitmap(
             superResRGB,
-            selectedBitmap.width * 1,
-            selectedBitmap.height * 1,
+            SR_IMAGE_WIDTH,
+            SR_IMAGE_HEIGHT,
             Bitmap.Config.ARGB_8888
         )
 
-//        lifecycleScope.launch {
-//            scaledImagePainterFlow.emit(BitmapPainter(srImgBitmap.asImageBitmap()))
-//        }
-
+        lifecycleScope.launch {
+            scaledImagePainterFlow.emit(BitmapPainter(srImgBitmap.asImageBitmap()))
+        }
     }
 
     @WorkerThread
